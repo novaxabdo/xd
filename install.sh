@@ -1,9 +1,9 @@
 #!/bin/bash
 
 #================================================================================#
-#                  n8n-Hosting-AIO Master Installer (V1.4)                       #
+#                  n8n-Hosting-AIO Master Installer (V1.5)                       #
 #                (c) 2024 - All-in-One Installation Script                       #
-#       **FIXED: Actively sanitizes user input to prevent \r errors**            #
+#    **FIXED: Aggressive 'sed' cleaning to permanently solve \r errors**         #
 #================================================================================#
 
 # --- Global Variables ---
@@ -26,7 +26,7 @@ fi
 echo -e "${GREEN}Starting n8n-Hosting-AIO Installation...${NC}"
 echo -e "${YELLOW}Updating package lists and installing core dependencies...${NC}"
 apt-get update > /dev/null 2>&1
-apt-get install -y docker.io docker-compose nginx certbot python3-certbot-nginx git dos2unix > /dev/null 2>&1
+apt-get install -y docker.io docker-compose nginx certbot python3-certbot-nginx git > /dev/null 2>&1
 
 echo -e "${YELLOW}Enabling and starting system services...${NC}"
 systemctl start docker && systemctl enable docker
@@ -73,7 +73,7 @@ get_server_info() {
 }
 show_menu() {
     get_server_info; clear
-    echo -e "    ${BLUE}●  n8n-Hosting-AIO (V1.4)  ●${NC}"
+    echo -e "    ${BLUE}●  n8n-Hosting-AIO (V1.5)  ●${NC}"
     echo " ┌──────────────────────────────────────────────────┐"
     echo " │ OS      : $OS"
     echo " │ Uptime  : $UPTIME"
@@ -90,22 +90,21 @@ if [ ! -f "$DOMAIN_FILE" ]; then
     clear
     echo -e "${YELLOW}First-Time Setup: Please enter your main domain name (e.g., myhosting.com):${NC}"
     read -p "Domain: " MAIN_DOMAIN
-    MAIN_DOMAIN=${MAIN_DOMAIN%$'\r'} # <-- THE FIX IS HERE
-    echo "$MAIN_DOMAIN" > "$DOMAIN_FILE"
+    echo "$MAIN_DOMAIN" | sed 's/\r$//' > "$DOMAIN_FILE" # <-- Definitive FIX
     echo -e "${GREEN}Domain name saved successfully!${NC}"; sleep 2
 fi
 while true; do
     show_menu
     read -p " SELECT OPTION FROM 0-4 : " choice
-    choice=${choice%$'\r'} # <-- Sanitize menu choice
+    choice=$(echo "$choice" | sed 's/\r$//') # <-- Definitive FIX
     case $choice in
         1) bash "$SCRIPT_DIR/add-client.sh"; read -p "Press [Enter] to return..." ;;
         2) bash "$SCRIPT_DIR/remove-client.sh"; read -p "Press [Enter] to return..." ;;
         3) bash "$SCRIPT_DIR/list-clients.sh"; read -p "Press [Enter] to return..." ;;
         4)
             echo "Enter new main domain:"; read NEW_DOMAIN
-            NEW_DOMAIN=${NEW_DOMAIN%$'\r'} # <-- THE FIX IS HERE
-            echo "$NEW_DOMAIN" > "$DOMAIN_FILE"; echo -e "${GREEN}Domain updated.${NC}"; sleep 2 ;;
+            echo "$NEW_DOMAIN" | sed 's/\r$//' > "$DOMAIN_FILE" # <-- Definitive FIX
+            echo -e "${GREEN}Domain updated.${NC}"; sleep 2 ;;
         0) exit 0 ;;
         *) echo -e "${RED}Invalid option.${NC}"; sleep 1 ;;
     esac
@@ -119,7 +118,7 @@ source "$(dirname "$0")/helpers.sh"
 clear; MAIN_DOMAIN=$(cat $DOMAIN_FILE); START_PORT=5679
 echo -e "${YELLOW}Enter a name for the new client (e.g., 'acme'):${NC}"
 read -p "Client Name: " CLIENT_NAME
-CLIENT_NAME=${CLIENT_NAME%$'\r'} # <-- THE FIX IS HERE
+CLIENT_NAME=$(echo "$CLIENT_NAME" | sed 's/\r$//')
 CLIENT_DIR="$HOSTING_DIR/$CLIENT_NAME"; CLIENT_DOMAIN="$CLIENT_NAME.$MAIN_DOMAIN"
 if [ -z "$CLIENT_NAME" ] || [ -d "$CLIENT_DIR" ]; then echo -e "${RED}Error: Client name is invalid or exists!${NC}"; exit 1; fi
 LAST_PORT=$(find $HOSTING_DIR -name 'docker-compose.yml' -exec grep -oP '127.0.0.1:\K[0-9]+' {} + 2>/dev/null | sort -rn | head -n 1)
@@ -149,12 +148,12 @@ source "$(dirname "$0")/helpers.sh"
 clear; MAIN_DOMAIN=$(cat $DOMAIN_FILE)
 echo -e "${YELLOW}Enter the name of the client to remove:${NC}"
 read -p "Client Name: " CLIENT_NAME
-CLIENT_NAME=${CLIENT_NAME%$'\r'} # <-- THE FIX IS HERE
+CLIENT_NAME=$(echo "$CLIENT_NAME" | sed 's/\r$//')
 CLIENT_DIR="$HOSTING_DIR/$CLIENT_NAME"; CLIENT_DOMAIN="$CLIENT_NAME.$MAIN_DOMAIN"
 if [ -z "$CLIENT_NAME" ] || [ ! -d "$CLIENT_DIR" ]; then echo -e "${RED}Error: Client '$CLIENT_NAME' not found!${NC}"; exit 1; fi
 echo -e "${RED}Permanently delete '$CLIENT_NAME' and all data? (y/n)${NC}"
 read -p "Confirm: " CONFIRM
-CONFIRM=${CONFIRM%$'\r'} # <-- Sanitize confirmation
+CONFIRM=$(echo "$CONFIRM" | sed 's/\r$//')
 if [ "$CONFIRM" != "y" ]; then echo "Aborted."; exit 0; fi
 (cd $CLIENT_DIR && docker-compose down -v)
 rm -f "/etc/nginx/sites-available/$CLIENT_DOMAIN" "/etc/nginx/sites-enabled/$CLIENT_DOMAIN"
@@ -175,8 +174,8 @@ for d in $HOSTING_DIR/*/; do client_name=$(basename "$d"); echo " - ${client_nam
 echo -e "-----------------------------------\n"
 EOF
 
-# --- Clean Up Line Endings (Just in case) ---
-dos2unix "$SCRIPTS_SUBDIR"/* > /dev/null 2>&1
+# --- Clean Up Line Endings from created files ---
+sed -i 's/\r$//g' $SCRIPTS_SUBDIR/*
 
 # --- Finalizing Setup ---
 echo -e "${YELLOW}Setting permissions and creating system command...${NC}"
