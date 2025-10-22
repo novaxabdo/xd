@@ -1,0 +1,84 @@
+#!/bin/bash
+
+# Source the helper file to get access to variables and functions
+source "$(dirname "$0")/helpers.sh"
+
+# --- Create necessary directories on first run ---
+mkdir -p "$HOSTING_DIR"
+mkdir -p "$CONFIG_DIR"
+
+#================================================================================#
+#                               MENU FUNCTIONS                                   #
+#================================================================================#
+
+# Function to get server info
+get_server_info() {
+    OS=$(hostnamectl | grep "Operating System" | cut -d ' ' -f5-)
+    CPU=$(lscpu | grep "Model name" | cut -d ':' -f2 | sed 's/^[ \t]*//')
+    CORES=$(nproc)
+    UPTIME=$(uptime -p)
+    DOMAIN=$(cat $DOMAIN_FILE 2>/dev/null || echo "not-set")
+    RAM_USAGE=$(free -m | awk 'NR==2{printf "%.0fMi", $3}')
+    TOTAL_RAM=$(free -m | awk 'NR==2{printf "%.0fMi", $2}')
+    CLIENT_COUNT=$(find $HOSTING_DIR -maxdepth 1 -mindepth 1 -type d | wc -l 2>/dev/null || echo "0")
+}
+
+# Function to display the main menu
+show_menu() {
+    get_server_info
+    clear
+    echo -e "    ${BLUE}●  n8n-Hosting-AIO (V1.0)  ●${NC}"
+    echo " ┌──────────────────────────────────────────────────┐"
+    echo " │ OS      : $OS"
+    echo " │ CPU     : $CORES Cores"
+    echo " │ Uptime  : $UPTIME"
+    echo " │ Domain  : $DOMAIN"
+    echo " ├──────────────────────────────────────────────────┤"
+    echo " │ RAM Usage  : $RAM_USAGE / $TOTAL_RAM"
+    echo " ├──────────────────────────────────────────────────┤"
+    echo " │ Accounts: n8n Clients ($CLIENT_COUNT)"
+    echo " │ Services: Docker (ON) | Nginx (ON)"
+    echo " └──────────────────────────────────────────────────┘"
+    echo -e "    ${YELLOW}● [       N8N HOSTING MENU       ] ●${NC}"
+    echo ""
+    echo " 1. Add New n8n Client"
+    echo " 2. Remove an n8n Client"
+    echo " 3. List All n8n Clients"
+    echo " 4. Set/Change Main Domain"
+    echo " 0. Exit"
+    echo ""
+}
+
+#================================================================================#
+#                                  MAIN LOGIC                                    #
+#================================================================================#
+
+# --- First-time domain setup ---
+if [ ! -f "$DOMAIN_FILE" ]; then
+    clear
+    echo -e "${YELLOW}First-Time Setup: Please enter your main domain name (e.g., myhosting.com):${NC}"
+    read -p "Domain: " MAIN_DOMAIN
+    echo "$MAIN_DOMAIN" > "$DOMAIN_FILE"
+    echo -e "${GREEN}Domain name saved successfully!${NC}"
+    sleep 2
+fi
+
+# --- Main Menu Loop ---
+while true; do
+    show_menu
+    read -p " SELECT OPTION FROM 0-4 : " choice
+    case $choice in
+        1) bash "$SCRIPT_DIR/add-client.sh"; read -p "Press [Enter] to return..." ;;
+        2) bash "$SCRIPT_DIR/remove-client.sh"; read -p "Press [Enter] to return..." ;;
+        3) bash "$SCRIPT_DIR/list-clients.sh"; read -p "Press [Enter] to return..." ;;
+        4)
+            echo "Enter your new main domain name:"
+            read NEW_DOMAIN
+            echo "$NEW_DOMAIN" > "$DOMAIN_FILE"
+            echo -e "${GREEN}Domain updated to $NEW_DOMAIN.${NC}"
+            sleep 2
+            ;;
+        0) exit 0 ;;
+        *) echo -e "${RED}Invalid option. Please try again.${NC}"; sleep 1 ;;
+    esac
+done
