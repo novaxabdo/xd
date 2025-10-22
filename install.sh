@@ -1,8 +1,9 @@
 #!/bin/bash
 
 #================================================================================#
-#                  n8n-Hosting-AIO Master Installer (V1.2)                       #
+#                  n8n-Hosting-AIO Master Installer (V1.3)                       #
 #                (c) 2024 - All-in-One Installation Script                       #
+#              **FIXED: Automatically handles Windows line endings**             #
 #================================================================================#
 
 # --- Global Variables ---
@@ -25,7 +26,8 @@ fi
 echo -e "${GREEN}Starting n8n-Hosting-AIO Installation...${NC}"
 echo -e "${YELLOW}Updating package lists and installing core dependencies...${NC}"
 apt-get update > /dev/null 2>&1
-apt-get install -y docker.io docker-compose nginx certbot python3-certbot-nginx git > /dev/null 2>&1
+# Added dos2unix to the installation list to fix line ending issues
+apt-get install -y docker.io docker-compose nginx certbot python3-certbot-nginx git dos2unix > /dev/null 2>&1
 
 echo -e "${YELLOW}Enabling and starting system services...${NC}"
 systemctl start docker && systemctl enable docker
@@ -72,7 +74,7 @@ get_server_info() {
 }
 show_menu() {
     get_server_info; clear
-    echo -e "    ${BLUE}●  n8n-Hosting-AIO (V1.2)  ●${NC}"
+    echo -e "    ${BLUE}●  n8n-Hosting-AIO (V1.3)  ●${NC}"
     echo " ┌──────────────────────────────────────────────────┐"
     echo " │ OS      : $OS"
     echo " │ Uptime  : $UPTIME"
@@ -167,6 +169,10 @@ if [ -z "$(ls -A $HOSTING_DIR 2>/dev/null)" ]; then echo "No clients found."; el
 for d in $HOSTING_DIR/*/; do client_name=$(basename "$d"); echo " - ${client_name} (URL: https://${client_name}.${MAIN_DOMAIN})"; done; fi
 echo -e "-----------------------------------\n"
 EOF
+
+# --- Clean Up Line Endings ---
+echo -e "${YELLOW}Converting all script files to Unix format...${NC}"
+dos2unix "$SCRIPTS_SUBDIR"/* > /dev/null 2>&1
 
 # --- Finalizing Setup ---
 echo -e "${YELLOW}Setting permissions and creating system command...${NC}"
